@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow · Gestor de Tareas</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0c0f14;
+            --surface: #151921;
+            --surface-2: #1c2230;
+            --surface-3: #232b3a;
+            --border: rgba(255,255,255,0.06);
+            --border-hover: rgba(255,255,255,0.12);
+            --text: #e8ecf4;
+            --text-muted: #7a8599;
+            --text-dim: #4a5568;
+            --accent: #22c55e;
+            --accent-glow: rgba(34,197,94,0.15);
+            --accent-2: #3b82f6;
+            --red: #ef4444;
+            --orange: #f59e0b;
+            --green: #22c55e;
+            --radius: 14px;
+            --radius-sm: 8px;
+            --shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ═══ BACKGROUND ═══ */
+        .bg-grid {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+        .bg-glow {
+            position: fixed; top: -200px; right: -200px; width: 600px; height: 600px;
+            background: radial-gradient(circle, rgba(34,197,94,0.06) 0%, transparent 70%);
+            z-index: 0; pointer-events: none;
+        }
+        .bg-glow-2 {
+            position: fixed; bottom: -200px; left: -100px; width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(59,130,246,0.04) 0%, transparent 70%);
+            z-index: 0; pointer-events: none;
+        }
+
+        /* ═══ LAYOUT ═══ */
+        .app { position: relative; z-index: 1; max-width: 520px; margin: 0 auto; padding: 20px 16px 100px; }
+
+        /* ═══ HEADER ═══ */
+        .header {
+            text-align: center; padding: 32px 0 28px;
+        }
+        .header .logo {
+            font-family: 'Space Mono', monospace; font-size: 0.7rem;
+            letter-spacing: 4px; text-transform: uppercase; color: var(--accent);
+            margin-bottom: 12px; display: flex; align-items: center;
+            justify-content: center; gap: 8px;
+        }
+        .header .logo::before, .header .logo::after {
+            content: ''; width: 20px; height: 1px; background: var(--accent); opacity: 0.4;
+        }
+        .header h1 {
+            font-size: 1.75rem; font-weight: 700; letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 30%, var(--text-muted));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .header .subtitle {
+            font-size: 0.82rem; color: var(--text-muted); margin-top: 6px;
+        }
+
+        /* ═══ CONFIG PANEL ═══ */
+        .config-toggle {
+            display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); cursor: pointer; color: var(--text-muted);
+            font-size: 0.8rem; margin-bottom: 16px; transition: all 0.2s;
+            width: 100%;
+        }
+        .config-toggle:hover { border-color: var(--border-hover); color: var(--text); }
+        .config-toggle .arrow { margin-left: auto; transition: transform 0.3s; }
+        .config-toggle.open .arrow { transform: rotate(180deg); }
+
+        .config-panel {
+            max-height: 0; overflow: hidden; transition: max-height 0.4s ease;
+            margin-bottom: 0;
+        }
+        .config-panel.open { max-height: 500px; margin-bottom: 16px; }
+        .config-inner {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 20px;
+        }
+        .config-inner label {
+            display: block; font-size: 0.75rem; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; margin-top: 14px;
+        }
+        .config-inner label:first-child { margin-top: 0; }
+        .config-inner input {
+            width: 100%; padding: 10px 14px; background: var(--surface-2);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text); font-family: 'Space Mono', monospace; font-size: 0.82rem;
+            outline: none; transition: border-color 0.2s;
+        }
+        .config-inner input:focus { border-color: var(--accent); }
+        .config-inner input::placeholder { color: var(--text-dim); }
+
+        .config-status {
+            margin-top: 16px; padding: 10px 14px; border-radius: var(--radius-sm);
+            font-size: 0.78rem; display: none;
+        }
+        .config-status.success { display: block; background: rgba(34,197,94,0.1); color: var(--green); }
+        .config-status.error { display: block; background: rgba(239,68,68,0.1); color: var(--red); }
+
+        .btn-save-config {
+            margin-top: 14px; width: 100%; padding: 10px; background: var(--surface-3);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.85rem;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .btn-save-config:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+
+        /* ═══ FORM ═══ */
+        .form-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        .form-card:focus-within { border-color: rgba(34,197,94,0.2); }
+
+        .form-section-title {
+            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px;
+            color: var(--text-dim); margin-bottom: 16px; font-weight: 600;
+        }
+
+        .input-group { margin-bottom: 16px; }
+        .input-group label {
+            display: block; font-size: 0.78rem; color: var(--text-muted);
+            margin-bottom: 6px; font-weight: 500;
+        }
+        .input-group input, .input-group select, .input-group textarea {
+            width: 100%; padding: 12px 14px; background: var(--surface-2);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+            outline: none; transition: all 0.2s;
+        }
+        .input-group textarea {
+            resize: vertical; min-height: 80px; line-height: 1.5;
+        }
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
+            border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .input-group select {
+            cursor: pointer; appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%237a8599' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 14px center;
+            padding-right: 36px;
+        }
+        .input-group select option { background: var(--surface-2); color: var(--text); }
+
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        /* ═══ PRIORITY CHIPS ═══ */
+        .priority-chips {
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .priority-chip {
+            padding: 8px 16px; border-radius: 20px; font-size: 0.82rem;
+            cursor: pointer; transition: all 0.2s; border: 1.5px solid var(--border);
+            background: transparent; color: var(--text-muted); font-family: 'DM Sans', sans-serif;
+        }
+        .priority-chip:hover { border-color: var(--border-hover); }
+        .priority-chip.active-high { border-color: var(--red); color: var(--red); background: rgba(239,68,68,0.08); }
+        .priority-chip.active-med { border-color: var(--orange); color: var(--orange); background: rgba(245,158,11,0.08); }
+        .priority-chip.active-low { border-color: var(--green); color: var(--green); background: rgba(34,197,94,0.08); }
+
+        /* ═══ SUBMIT BUTTON ═══ */
+        .btn-submit {
+            width: 100%; padding: 14px; background: var(--accent);
+            border: none; border-radius: var(--radius-sm); color: #000;
+            font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 600;
+            cursor: pointer; transition: all 0.25s; position: relative; overflow: hidden;
+            letter-spacing: 0.3px;
+        }
+        .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(34,197,94,0.25); }
+        .btn-submit:active { transform: translateY(0); }
+        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-submit .spinner {
+            display: none; width: 18px; height: 18px; border: 2px solid rgba(0,0,0,0.2);
+            border-top-color: #000; border-radius: 50%; animation: spin 0.6s linear infinite;
+            margin: 0 auto;
+        }
+        .btn-submit.loading .btn-text { display: none; }
+        .btn-submit.loading .spinner { display: block; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ═══ TOAST ═══ */
+        .toast-container {
+            position: fixed; top: 20px; right: 20px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .toast {
+            padding: 14px 20px; border-radius: var(--radius-sm);
+            font-size: 0.85rem; font-weight: 500; animation: slideIn 0.3s ease;
+            box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px;
+            max-width: 360px;
+        }
+        .toast.success { background: #065f46; color: #a7f3d0; }
+        .toast.error { background: #7f1d1d; color: #fca5a5; }
+        .toast.info { background: #1e3a5f; color: #93c5fd; }
+        .toast-close {
+            background: none; border: none; color: inherit; cursor: pointer;
+            margin-left: auto; opacity: 0.6; font-size: 1.1rem;
+        }
+        .toast-close:hover { opacity: 1; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ═══ TASK QUEUE ═══ */
+        .queue-section { margin-top: 8px; }
+        .queue-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .queue-header h3 {
+            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px;
+            color: var(--text-dim); font-weight: 600;
+        }
+        .queue-count {
+            font-family: 'Space Mono', monospace; font-size: 0.72rem;
+            color: var(--accent); background: var(--accent-glow);
+            padding: 3px 10px; border-radius: 10px;
+        }
+
+        .task-item {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 14px 16px;
+            margin-bottom: 8px; display: flex; align-items: flex-start; gap: 12px;
+            animation: fadeUp 0.3s ease;
+        }
+        .task-item .priority-dot {
+            width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0;
+        }
+        .task-item .priority-dot.high { background: var(--red); box-shadow: 0 0 6px rgba(239,68,68,0.4); }
+        .task-item .priority-dot.med { background: var(--orange); box-shadow: 0 0 6px rgba(245,158,11,0.4); }
+        .task-item .priority-dot.low { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.4); }
+
+        .task-item .task-info { flex: 1; min-width: 0; }
+        .task-item .task-name { font-size: 0.88rem; font-weight: 500; margin-bottom: 4px; }
+        .task-item .task-meta {
+            font-size: 0.75rem; color: var(--text-muted);
+            font-family: 'Space Mono', monospace; display: flex; gap: 12px;
+        }
+        .task-item .btn-delete {
+            background: none; border: none; color: var(--text-dim); cursor: pointer;
+            font-size: 0.9rem; padding: 4px; transition: color 0.2s; flex-shrink: 0;
+        }
+        .task-item .btn-delete:hover { color: var(--red); }
+
+        .btn-send-all {
+            width: 100%; padding: 14px; background: var(--accent-2);
+            border: none; border-radius: var(--radius-sm); color: #fff;
+            font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 600;
+            cursor: pointer; transition: all 0.25s; margin-top: 14px;
+        }
+        .btn-send-all:hover { box-shadow: 0 6px 24px rgba(59,130,246,0.25); transform: translateY(-1px); }
+        .btn-send-all:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-send-all.loading { pointer-events: none; }
+
+        .empty-state {
+            text-align: center; padding: 40px 20px; color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.4; }
+
+        @keyframes fadeUp {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* ═══ INSTRUCTIONS PANEL ═══ */
+        .instructions {
+            margin-top: 24px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 20px 24px;
+        }
+        .instructions summary {
+            font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.5px;
+            color: var(--text-muted); cursor: pointer; font-weight: 600;
+            list-style: none; display: flex; align-items: center; gap: 8px;
+        }
+        .instructions summary::before { content: '▸'; transition: transform 0.2s; }
+        .instructions[open] summary::before { transform: rotate(90deg); }
+        .instructions .steps { margin-top: 16px; }
+        .instructions .step {
+            display: flex; gap: 12px; margin-bottom: 16px; font-size: 0.84rem;
+            color: var(--text-muted); line-height: 1.6;
+        }
+        .instructions .step-num {
+            width: 24px; height: 24px; border-radius: 50%; background: var(--surface-3);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Space Mono', monospace; font-size: 0.7rem;
+            color: var(--accent); flex-shrink: 0; margin-top: 1px;
+        }
+        .instructions code {
+            background: var(--surface-3); padding: 2px 6px; border-radius: 4px;
+            font-family: 'Space Mono', monospace; font-size: 0.78rem; color: var(--accent);
+        }
+        .instructions .code-block {
+            background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 14px; margin: 10px 0; overflow-x: auto; font-family: 'Space Mono', monospace;
+            font-size: 0.72rem; line-height: 1.6; color: var(--text-muted);
+            max-height: 400px; overflow-y: auto;
+        }
+        .instructions .copy-script-btn {
+            margin-top: 8px; padding: 8px 16px; background: var(--surface-3);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text-muted); font-family: 'DM Sans', sans-serif; font-size: 0.8rem;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .instructions .copy-script-btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+
+        /* ═══ RESPONSIVE ═══ */
+        @media (max-width: 540px) {
+            .app { padding: 12px 12px 80px; }
+            .row-2 { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.4rem; }
+            .toast { max-width: calc(100vw - 40px); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+<div class="bg-glow-2"></div>
+
+<div class="app">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="logo">TaskFlow</div>
+        <h1>Gestor de Tareas</h1>
+        <p class="subtitle">Agrega tareas → Envía al Sheet → Recibe por WhatsApp</p>
+    </div>
+
+    <!-- CONFIG -->
+    <button class="config-toggle" onclick="toggleConfig()" id="configToggle">
+        ⚙️ Configuración de Google Sheet
+        <span class="arrow">▾</span>
+    </button>
+    <div class="config-panel" id="configPanel">
+        <div class="config-inner">
+            <label>URL del Web App (Apps Script)</label>
+            <input type="url" id="cfgUrl" placeholder="https://script.google.com/macros/s/xxxxx/exec" 
+                   spellcheck="false" autocomplete="off">
+            
+            <div id="configStatus" class="config-status"></div>
+            
+            <button class="btn-save-config" onclick="saveConfig()">Guardar configuración</button>
+        </div>
+    </div>
+
+    <!-- FORM -->
+    <div class="form-card">
+        <div class="form-section-title">Nueva tarea</div>
+        
+        <div class="input-group">
+            <label>Tarea</label>
+            <input type="text" id="taskName" placeholder="Ej: Revisar inventario de cocina" autocomplete="off">
+        </div>
+        
+        <div class="row-2">
+            <div class="input-group">
+                <label>Fecha</label>
+                <input type="date" id="taskDate">
+            </div>
+            <div class="input-group">
+                <label>Hora</label>
+                <input type="time" id="taskTime" value="09:00">
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Prioridad</label>
+            <div class="priority-chips">
+                <button class="priority-chip active-high" data-priority="🔴 Alta" onclick="selectPriority(this)">🔴 Alta</button>
+                <button class="priority-chip" data-priority="🟡 Media" onclick="selectPriority(this)">🟡 Media</button>
+                <button class="priority-chip" data-priority="🟢 Baja" onclick="selectPriority(this)">🟢 Baja</button>
+            </div>
+        </div>
+
+        <button class="btn-submit" onclick="addToQueue()" id="btnAdd">
+            <span class="btn-text">＋ Agregar a la cola</span>
+        </button>
+    </div>
+
+    <!-- QUEUE -->
+    <div class="queue-section" id="queueSection" style="display:none;">
+        <div class="queue-header">
+            <h3>Cola de tareas</h3>
+            <span class="queue-count" id="queueCount">0</span>
+        </div>
+        <div id="queueList"></div>
+        
+        <button class="btn-send-all" onclick="sendAllToSheet()" id="btnSendAll">
+            <span class="btn-text">📤 Enviar todo al Google Sheet</span>
+            <span class="spinner" style="display:none;width:18px;height:18px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto;"></span>
+        </button>
+    </div>
+
+    <!-- EMPTY STATE -->
+    <div class="empty-state" id="emptyState">
+        <div class="icon">📝</div>
+        <p>Agrega tareas y envíalas a tu Google Sheet<br>con un solo clic</p>
+    </div>
+
+    <!-- INSTRUCTIONS -->
+    <details class="instructions">
+        <summary>Instrucciones de configuración</summary>
+        <div class="steps">
+            <div class="step">
+                <span class="step-num">1</span>
+                <div>Crea un <strong>Google Sheet</strong> con estas columnas en la fila 1: <code>Fecha</code> · <code>Hora</code> · <code>Tarea</code> · <code>Prioridad</code> · <code>Estado</code></div>
+            </div>
+            <div class="step">
+                <span class="step-num">2</span>
+                <div>Ve a <strong>Extensiones → Apps Script</strong> y pega este código:</div>
+            </div>
+            <div class="code-block" id="scriptCode">function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Hoja 1");
+  var data = JSON.parse(e.postData.contents);
+  
+  var tareas = data.tareas;
+  
+  for (var i = 0; i &lt; tareas.length; i++) {
+    sheet.appendRow([
+      tareas[i].fecha,
+      tareas[i].hora,
+      tareas[i].tarea,
+      tareas[i].prioridad,
+      "Pendiente"
+    ]);
+  }
+  
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      status: "ok",
+      count: tareas.length
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      status: "ok",
+      message: "API de Tareas activa"
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ═══════════════════════════════════════════
+// ENVÍO AUTOMÁTICO POR WHATSAPP (cada hora)
+// ═══════════════════════════════════════════
+var CONFIG = {
+  PHONE: "51XXXXXXXXX",
+  API_KEY: "TU_API_KEY",
+  SHEET_NAME: "Hoja 1",
+  TIMEZONE: "America/Lima",
+  HORA_INICIO: 7,
+  HORA_FIN: 21,
+};
+
+function enviarTareasWhatsApp() {
+  var ahora = new Date();
+  var horaActual = Number(
+    Utilities.formatDate(ahora, CONFIG.TIMEZONE, "H")
+  );
+  if (horaActual &lt; CONFIG.HORA_INICIO || horaActual >= CONFIG.HORA_FIN) return;
+
+  var hoy = Utilities.formatDate(ahora, CONFIG.TIMEZONE, "dd/MM/yyyy");
+  var horaStr = Utilities.formatDate(ahora, CONFIG.TIMEZONE, "HH:mm");
+  var sheet = SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName(CONFIG.SHEET_NAME);
+  var datos = sheet.getDataRange().getValues();
+  var tareasHoy = [];
+
+  for (var i = 1; i &lt; datos.length; i++) {
+    var fecha = datos[i][0];
+    var fechaF = fecha instanceof Date
+      ? Utilities.formatDate(fecha, CONFIG.TIMEZONE, "dd/MM/yyyy")
+      : String(fecha);
+    if (fechaF === hoy 
+        && String(datos[i][4]).toLowerCase() !== "completada") {
+      tareasHoy.push({
+        hora: datos[i][1] instanceof Date
+          ? Utilities.formatDate(datos[i][1], CONFIG.TIMEZONE, "HH:mm")
+          : datos[i][1],
+        tarea: datos[i][2],
+        prioridad: datos[i][3]
+      });
+    }
+  }
+
+  if (tareasHoy.length === 0) {
+    enviarWhatsApp(
+      "✅ No tienes tareas pendientes hoy (" + horaStr + ")"
+    );
+    return;
+  }
+
+  var msg = "📋 *TAREAS HOY* (" + hoy + ")\n⏰ " + horaStr + "\n━━━━━━━━━━━━\n\n";
+  for (var j = 0; j &lt; tareasHoy.length; j++) {
+    msg += (j + 1) + ". " + tareasHoy[j].prioridad 
+      + " *" + tareasHoy[j].tarea + "*\n   🕐 " 
+      + tareasHoy[j].hora + "\n\n";
+  }
+  msg += "━━━━━━━━━━━━\n📊 " + tareasHoy.length + " pendiente(s)";
+  enviarWhatsApp(msg);
+}
+
+function enviarWhatsApp(mensaje) {
+  var url = "https://api.callmebot.com/whatsapp.php"
+    + "?phone=" + CONFIG.PHONE
+    + "&text=" + encodeURIComponent(mensaje)
+    + "&apikey=" + CONFIG.API_KEY;
+  try {
+    UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  } catch(err) {
+    Logger.log("Error: " + err.message);
+  }
+}
+
+function crearTriggerHorario() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var t = 0; t &lt; triggers.length; t++) {
+    ScriptApp.deleteTrigger(triggers[t]);
+  }
+  ScriptApp.newTrigger("enviarTareasWhatsApp")
+    .timeBased().everyHours(1).create();
+}
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu("📋 Tareas")
+    .addItem("📱 Enviar tareas ahora", "enviarTareasWhatsApp")
+    .addItem("⏰ Activar envío cada hora", "crearTriggerHorario")
+    .addToUi();
+}</div>
+            <button class="copy-script-btn" onclick="copyScript()">📋 Copiar código completo</button>
+            
+            <div class="step" style="margin-top: 16px;">
+                <span class="step-num">3</span>
+                <div>En Apps Script: <strong>Implementar → Nueva implementación</strong> → tipo <code>Aplicación web</code> → acceso <code>Cualquier persona</code> → <strong>Implementar</strong>. Copia la URL.</div>
+            </div>
+            <div class="step">
+                <span class="step-num">4</span>
+                <div>Pega la URL arriba en <strong>⚙️ Configuración</strong> y guarda.</div>
+            </div>
+            <div class="step">
+                <span class="step-num">5</span>
+                <div>Edita <code>CONFIG.PHONE</code> y <code>CONFIG.API_KEY</code> en el script con tus datos de CallMeBot. Luego ejecuta <code>crearTriggerHorario</code> para activar WhatsApp.</div>
+            </div>
+        </div>
+    </details>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+    // ═══ STATE ═══
+    let taskQueue = [];
+    let selectedPriority = "🔴 Alta";
+    let webAppUrl = localStorage.getItem("taskflow_url") || "";
+
+    // ═══ INIT ═══
+    document.addEventListener("DOMContentLoaded", () => {
+        // Set default date to today
+        const today = new Date();
+        document.getElementById("taskDate").value = today.toISOString().split("T")[0];
+        
+        // Load saved URL
+        if (webAppUrl) {
+            document.getElementById("cfgUrl").value = webAppUrl;
+        }
+
+        // Load queued tasks from sessionStorage
+        const saved = sessionStorage.getItem("taskflow_queue");
+        if (saved) {
+            taskQueue = JSON.parse(saved);
+            renderQueue();
+        }
+
+        // Enter key to add task
+        document.getElementById("taskName").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") addToQueue();
+        });
+    });
+
+    // ═══ CONFIG ═══
+    function toggleConfig() {
+        const panel = document.getElementById("configPanel");
+        const toggle = document.getElementById("configToggle");
+        panel.classList.toggle("open");
+        toggle.classList.toggle("open");
+    }
+
+    function saveConfig() {
+        const url = document.getElementById("cfgUrl").value.trim();
+        const status = document.getElementById("configStatus");
+        
+        if (!url) {
+            status.className = "config-status error";
+            status.textContent = "⚠️ Ingresa la URL del Web App";
+            return;
+        }
+        if (!url.startsWith("https://script.google.com/")) {
+            status.className = "config-status error";
+            status.textContent = "⚠️ La URL debe ser de script.google.com";
+            return;
+        }
+        
+        webAppUrl = url;
+        localStorage.setItem("taskflow_url", url);
+        status.className = "config-status success";
+        status.textContent = "✅ URL guardada correctamente";
+        
+        setTimeout(() => { status.className = "config-status"; }, 3000);
+    }
+
+    // ═══ PRIORITY ═══
+    function selectPriority(chip) {
+        document.querySelectorAll(".priority-chip").forEach(c => {
+            c.className = "priority-chip";
+        });
+        const p = chip.dataset.priority;
+        selectedPriority = p;
+        if (p.includes("Alta")) chip.classList.add("active-high");
+        else if (p.includes("Media")) chip.classList.add("active-med");
+        else chip.classList.add("active-low");
+    }
+
+    // ═══ ADD TO QUEUE ═══
+    function addToQueue() {
+        const name = document.getElementById("taskName").value.trim();
+        const date = document.getElementById("taskDate").value;
+        const time = document.getElementById("taskTime").value;
+
+        if (!name) {
+            showToast("Escribe el nombre de la tarea", "error");
+            document.getElementById("taskName").focus();
+            return;
+        }
+        if (!date) {
+            showToast("Selecciona una fecha", "error");
+            return;
+        }
+
+        // Format date as dd/MM/yyyy for the Sheet
+        const [y, m, d] = date.split("-");
+        const fechaFormatted = `${d}/${m}/${y}`;
+
+        taskQueue.push({
+            fecha: fechaFormatted,
+            hora: time || "00:00",
+            tarea: name,
+            prioridad: selectedPriority,
+            id: Date.now()
+        });
+
+        sessionStorage.setItem("taskflow_queue", JSON.stringify(taskQueue));
+        
+        // Reset input
+        document.getElementById("taskName").value = "";
+        document.getElementById("taskName").focus();
+        
+        renderQueue();
+        showToast(`"${name}" agregada a la cola`, "success");
+    }
+
+    // ═══ RENDER QUEUE ═══
+    function renderQueue() {
+        const section = document.getElementById("queueSection");
+        const empty = document.getElementById("emptyState");
+        const list = document.getElementById("queueList");
+        const count = document.getElementById("queueCount");
+
+        if (taskQueue.length === 0) {
+            section.style.display = "none";
+            empty.style.display = "block";
+            return;
+        }
+
+        section.style.display = "block";
+        empty.style.display = "none";
+        count.textContent = taskQueue.length;
+
+        list.innerHTML = taskQueue.map((t, i) => {
+            let dotClass = "low";
+            if (t.prioridad.includes("Alta")) dotClass = "high";
+            else if (t.prioridad.includes("Media")) dotClass = "med";
+
+            return `
+                <div class="task-item">
+                    <div class="priority-dot ${dotClass}"></div>
+                    <div class="task-info">
+                        <div class="task-name">${escapeHtml(t.tarea)}</div>
+                        <div class="task-meta">
+                            <span>📅 ${t.fecha}</span>
+                            <span>🕐 ${t.hora}</span>
+                        </div>
+                    </div>
+                    <button class="btn-delete" onclick="removeFromQueue(${i})" title="Eliminar">✕</button>
+                </div>
+            `;
+        }).join("");
+    }
+
+    function removeFromQueue(index) {
+        taskQueue.splice(index, 1);
+        sessionStorage.setItem("taskflow_queue", JSON.stringify(taskQueue));
+        renderQueue();
+    }
+
+    // ═══ SEND TO SHEET ═══
+    async function sendAllToSheet() {
+        if (taskQueue.length === 0) {
+            showToast("No hay tareas en la cola", "error");
+            return;
+        }
+        if (!webAppUrl) {
+            showToast("Configura la URL del Web App primero", "error");
+            toggleConfig();
+            return;
+        }
+
+        const btn = document.getElementById("btnSendAll");
+        btn.disabled = true;
+        btn.classList.add("loading");
+        btn.querySelector(".btn-text").style.display = "none";
+        btn.querySelector(".spinner").style.display = "block";
+
+        try {
+            const payload = {
+                tareas: taskQueue.map(t => ({
+                    fecha: t.fecha,
+                    hora: t.hora,
+                    tarea: t.tarea,
+                    prioridad: t.prioridad
+                }))
+            };
+
+            const response = await fetch(webAppUrl, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain" },
+                body: JSON.stringify(payload),
+                mode: "no-cors"
+            });
+
+            // With no-cors we can't read the response, but if no error it worked
+            const count = taskQueue.length;
+            taskQueue = [];
+            sessionStorage.removeItem("taskflow_queue");
+            renderQueue();
+            
+            showToast(`✅ ${count} tarea(s) enviada(s) al Google Sheet`, "success");
+
+        } catch (error) {
+            console.error("Error:", error);
+            showToast("Error al enviar. Verifica la URL y permisos.", "error");
+        } finally {
+            btn.disabled = false;
+            btn.classList.remove("loading");
+            btn.querySelector(".btn-text").style.display = "block";
+            btn.querySelector(".spinner").style.display = "none";
+        }
+    }
+
+    // ═══ TOAST ═══
+    function showToast(message, type = "info") {
+        const container = document.getElementById("toastContainer");
+        const toast = document.createElement("div");
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+            <span>${message}</span>
+            <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => { toast.remove(); }, 4000);
+    }
+
+    // ═══ COPY SCRIPT ═══
+    function copyScript() {
+        const code = document.getElementById("scriptCode").innerText;
+        navigator.clipboard.writeText(code).then(() => {
+            showToast("Código copiado al portapapeles", "success");
+        }).catch(() => {
+            // Fallback
+            const ta = document.createElement("textarea");
+            ta.value = code;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            showToast("Código copiado al portapapeles", "success");
+        });
+    }
+
+    // ═══ UTILS ═══
+    function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+
+</body>
+</html>
